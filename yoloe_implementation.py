@@ -180,7 +180,7 @@ def read_face(og_image):
     # Divide into 3x3 grid
     step_x = fw / 3.0
     step_y = fh / 3.0
-    id_radius = int(min(step_x, step_y))
+    id_radius = int(min(step_x / 3, step_y / 3))
 
     square_results = []
     lab_results = []
