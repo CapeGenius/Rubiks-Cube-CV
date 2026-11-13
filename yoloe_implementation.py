@@ -104,64 +104,46 @@ def thresholding_preprocessing(frame):
     return edges
 
 
-model = YOLOE("./runs/detect/train-2/weights/best.pt")
-# model.set_classes(["side-of-rubiks-cube"])
-
-# Open the default webcam (0)
-cap = cv2.VideoCapture(1)
-
-WINDOW = "Cube Detection"
-cv2.namedWindow(WINDOW)
-
-
 def nothing(_):
     pass
 
 
-#                  name,              window, start, max
-cv2.createTrackbar("Radius coef", WINDOW, 20, 50, nothing)
-cv2.createTrackbar("Edge thresh x100", WINDOW, 5, 50, nothing)  # 5 -> 0.05
-cv2.createTrackbar("Hough thresh", WINDOW, 200, 500, nothing)
-cv2.createTrackbar("Min line len", WINDOW, 80, 400, nothing)
-cv2.createTrackbar("Max line gap", WINDOW, 10, 100, nothing)
+def run_yoloe_detection():
 
-while cap.isOpened():
-    success, frame = cap.read()
-    if not success:
-        break
+    model = YOLOE("./runs/segment/train-3/weights/best.pt")
+    # model.set_classes(["side-of-rubiks-cube"])
 
-    # predict based on frame
-    results = model.predict(frame)
+    # Open the default webcam (0)
+    cap = cv2.VideoCapture(1)
 
-    # read from trackbar
-    # radius_coef = max(1, cv2.getTrackbarPos("Radius coef", WINDOW))
-    # edge_thresh = cv2.getTrackbarPos("Edge thresh x100", WINDOW) / 100
-    # hough_thresh = max(1, cv2.getTrackbarPos("Hough thresh", WINDOW))
-    # min_line_len = cv2.getTrackbarPos("Min line len", WINDOW)
-    # max_line_gap = cv2.getTrackbarPos("Max line gap", WINDOW)
+    WINDOW = "Cube Detection"
+    cv2.namedWindow(WINDOW)
 
-    # edges = fft_preprocessing(
-    #     frame, radius_coef, edge_thresh, hough_thresh, min_line_len, max_line_gap
-    # )
-    # edges = thresholding_preprocessing(
-    #     frame, radius_coef, edge_thresh, min_line_len, max_line_gap
-    # )
+    while cap.isOpened():
+        success, frame = cap.read()
+        if not success:
+            break
 
-    for r in results:
-        annotated_frame = r.plot()
-        # r.masks
+        # predict based on frame
+        results = model.predict(frame)
 
-    display = annotated_frame
-    cv2.imshow(WINDOW, display)
+        for r in results:
+            annotated_frame = r.plot()
+            # r.masks
 
-    # Press 'q' to exit the video window
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
+        display = annotated_frame
+        cv2.imshow(WINDOW, display)
 
-cap.release()
-cv2.destroyAllWindows()
+        # Press 'q' to exit the video window
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 
+if __name__ == "__main__":
+    run_yoloe_detection()
 """
 @misc{kirillov2023segment,
       title={Segment Anything},
