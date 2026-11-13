@@ -12,6 +12,9 @@ from skimage.filters import roberts, prewitt
 # used this kaggle dataset: https://www.kaggle.com/datasets/aryan7004/rubiks-cube-face-dataset/data
 # figured out object isolation from segmentation using this: https://docs.ultralytics.com/guides/isolating-segmentation-objects
 
+CENTERS_DICT = {"B": None, "W": None, "G": None, "R": None, "Y": None, "O": None}
+ordered_scan = []
+
 
 def generate_cicle(original_image, radius_coefficient):
     height, width = original_image.shape[:2]
@@ -240,14 +243,6 @@ def read_face(og_image):
 
         square_results.append(row_colors)
 
-    # 3 rows each with 3 squares
-    # for r in range(3):
-    #     row_colors = []
-    #     for c in range(3):
-    #         # Finding the center points
-    #         cx = int(fx + (c) * step_x)
-    #         cy = int(fy + (r) * step_y)
-
     # Draw 3x3 grid over image
     for i in range(4):
         x = int(fx + i * step_x)
@@ -256,7 +251,7 @@ def read_face(og_image):
         cv2.line(annotated_img, (fx, y), (fx + fw, y), (0, 255, 0), 2)
 
     # Return LAB samples
-    return lab_results, annotated_img
+    return lab_results, annotated_img, square_results
 
 
 def run_yoloe_detection():
@@ -270,7 +265,7 @@ def run_yoloe_detection():
     WINDOW = "Cube Detection"
     cv2.namedWindow(WINDOW)
 
-    while cap.isOpened():
+    while cap.isOpened() and len(ordered_scan) < 6:
         success, frame = cap.read()
         if not success:
             break
@@ -294,6 +289,8 @@ def run_yoloe_detection():
                 # get the box and check confidence score
                 if face.boxes[0].conf.item() > 0.87:
                     print(f"face mask is {face.masks.xy}")
+
+                    # gets the image from the mask and creates an isolated image
                     contour = face.masks.xy[0].astype(np.int32).reshape(-1, 1, 2)
                     cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
                     mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
@@ -314,8 +311,22 @@ def run_yoloe_detection():
                         (0, 255, 0),
                     )
 
-                    lab_results, annotated_image = read_face(iso_crop)
+                    lab_results, annotated_image, square_results = read_face(iso_crop)
                     display = annotated_image
+
+                    # get the center of face
+                    center_char = COLOR_MAPPINGS[square_results[1][1]]["char"]
+
+                    # ASSUME ORIENTATION STEPS: must rotate 2 right, 1 up, then 2 right
+
+                    # check if face has been scanned
+                    if CENTERS_DICT[center_char] is None:
+                        # store each face at scan assuming that rotation follows a certain pattern
+                        CENTERS_DICT[center_char] = lab_results
+                        ordered_scan.append(center_char)
+                    else:
+                        pass
+                        # cv2.putText(display)
 
         cv2.imshow(WINDOW, display)
 
