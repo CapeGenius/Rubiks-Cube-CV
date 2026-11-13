@@ -10,6 +10,7 @@ from skimage.filters import roberts, prewitt
 # implemented live camera with yoloe using this source:
 #   https://academy.ultralytics.com/courses/train-your-first-yolo/video-inference
 # used this kaggle dataset: https://www.kaggle.com/datasets/aryan7004/rubiks-cube-face-dataset/data
+# figured out object isolation from segmentation using this: https://docs.ultralytics.com/guides/isolating-segmentation-objects
 
 
 def generate_cicle(original_image, radius_coefficient):
@@ -108,6 +109,97 @@ def nothing(_):
     pass
 
 
+def read_face(og_image):
+    """Read colors of 9 squares on cube face"""
+
+    # if face_bounding_box is None:
+    #     largest_contour = max(contours, key=cv2.contourArea)
+    #     face_bounding_box = cv2.boundingRect(largest_contour)
+
+    fx, fy, fw, fh = face_box(og_image)
+    # print(f"Box: X={fx}, Y={fy}, W={fw}, H={fh}")
+
+    # Originally had a complicated way to get squares inside bounding box, now trying ot get the 3x3 and classify colors
+    hsv_image = cv2.cvtColor(og_image, cv2.COLOR_BGR2HSV)
+    lab_image = cv2.cvtColor(og_image, cv2.COLOR_BGR2LAB)
+    # Divide into 3x3 grid
+    step_x = fw / 3.0
+    step_y = fh / 3.0
+    id_radius = int(
+        min(step_x, step_y) * 0.15
+    )  # where it should look for the squares of rubiks cubs with 15% buffer
+
+    square_results = []
+    lab_results = []
+
+    annotated_img = og_image.copy()  # to store
+
+    # 3 rows each with 3 squares
+    for r in range(3):
+        row_colors = []
+        for c in range(3):
+            # Finding the center points
+            cx = int(fx + (c + 0.5) * step_x)
+            cy = int(fy + (r + 0.5) * step_y)
+
+            # Finding the central patch and median HSV to hopefully ignore the noise
+            patch = hsv_image[
+                cy - id_radius : cy + id_radius, cx - id_radius : cx + id_radius
+            ]
+            med_h = np.median(patch[:, :, 0])
+            med_s = np.median(patch[:, :, 1])
+            med_v = np.median(patch[:, :, 2])
+
+            color_name = classify_hsv_color(med_h, med_s, med_v)
+            row_colors.append(color_name)
+
+            lab_patch = lab_image[
+                cy - id_radius : cy + id_radius, cx - id_radius : cx + id_radius
+            ]
+            lab_results.append(np.median(lab_patch, axis=(0, 1)))
+
+            # Show
+            cv2.rectangle(
+                annotated_img,
+                (cx - id_radius, cy - id_radius),
+                (cx + id_radius, cy + id_radius),
+                (0, 255, 0),
+                1,
+            )
+            # Make letters more readable on cube
+            char = COLOR_MAPPINGS.get(color_name, {"char": "?"})["char"]
+            cv2.putText(
+                annotated_img,
+                char,
+                (cx - 9, cy + 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (0, 0, 0),
+                4,
+            )
+            cv2.putText(
+                annotated_img,
+                char,
+                (cx - 9, cy + 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (255, 255, 255),
+                2,
+            )
+
+        square_results.append(row_colors)
+
+    # Draw 3x3 grid over image
+    for i in range(4):
+        x = int(fx + i * step_x)
+        y = int(fy + i * step_y)
+        cv2.line(annotated_img, (x, fy), (x, fy + fh), (0, 255, 0), 2)
+        cv2.line(annotated_img, (fx, y), (fx + fw, y), (0, 255, 0), 2)
+
+    # Return LAB samples
+    return lab_results, annotated_img
+
+
 def run_yoloe_detection():
 
     model = YOLOE("./runs/segment/train-3/weights/best.pt")
@@ -131,7 +223,39 @@ def run_yoloe_detection():
             annotated_frame = r.plot()
             # r.masks
 
-        display = annotated_frame
+        b_mask = np.zeros(frame.shape[:2], np.uint8)
+        display = b_mask
+        # get the first rubiks cube face
+
+        if len(results) > 0:
+
+            face = results[0]
+
+            if len(face.boxes) > 0:
+                # get the box and check confidence score
+                if face.boxes[0].conf.item() > 0.88:
+                    print(f"face mask is {face.masks.xy}")
+                    contour = face.masks.xy[0].astype(np.int32).reshape(-1, 1, 2)
+                    cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
+                    mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
+                    isolated = cv2.bitwise_and(mask3ch, frame)
+
+                    # Bounding box coordinates
+                    x1, y1, x2, y2 = (
+                        face.boxes.xyxy.cpu().numpy().squeeze().astype(np.int32)
+                    )
+                    # Crop the isolated image to the object region
+                    iso_crop = isolated[y1:y2, x1:x2]
+                    display = iso_crop
+                    cv2.putText(
+                        display,
+                        f"confidence score {face.boxes[0].conf.item()}",
+                        (10, 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        (0, 255, 0),
+                    )
+
         cv2.imshow(WINDOW, display)
 
         # Press 'q' to exit the video window
