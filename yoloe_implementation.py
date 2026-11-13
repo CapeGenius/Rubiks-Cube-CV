@@ -61,18 +61,27 @@ def hough_transform(
 
     if lines is not None:
         for x1, y1, x2, y2 in lines.reshape(-1, 4):
-            cv2.line(edges, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
+            cv2.line(edges, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
 
     return edges
 
 
-def fft_preprocessing(frame):
+def fft_preprocessing(
+    frame, radius_coef, edge_thresh, hough_thresh, min_line_len, max_line_gap
+):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    fft_image = filter_image_fft(gray, 2)
+    fft_image = filter_image_fft(gray, radius_coef)
     mag = prewitt(fft_image)
-    edges = (mag > 0.05).astype(np.uint8) * 255
+    edges = (mag > edge_thresh).astype(np.uint8) * 255
 
-    edges = hough_transform(edges)
+    edges = hough_transform(
+        edges,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=hough_thresh,
+        minLineLength=min_line_len,
+        maxLineGap=max_line_gap,
+    )
 
     return edges
 
@@ -99,16 +108,41 @@ model = YOLOE("yoloe-26m-seg.pt")
 # Open the default webcam (0)
 cap = cv2.VideoCapture(0)
 
+WINDOW = "Cube Detection"
+cv2.namedWindow(WINDOW)
+
+
+def nothing(_):
+    pass
+
+
+#                  name,              window, start, max
+cv2.createTrackbar("Radius coef", WINDOW, 20, 50, nothing)
+cv2.createTrackbar("Edge thresh x100", WINDOW, 5, 50, nothing)  # 5 -> 0.05
+cv2.createTrackbar("Hough thresh", WINDOW, 200, 500, nothing)
+cv2.createTrackbar("Min line len", WINDOW, 80, 400, nothing)
+cv2.createTrackbar("Max line gap", WINDOW, 10, 100, nothing)
+
 while cap.isOpened():
     success, frame = cap.read()
     if not success:
         break
 
-    WINDOW = "Cube Detection"
-    # edges = fft_preprocessing(frame)
-    edges = thresholding_preprocessing(frame)
+    radius_coef = max(1, cv2.getTrackbarPos("Radius coef", WINDOW))
+    edge_thresh = cv2.getTrackbarPos("Edge thresh x100", WINDOW) / 100
+    hough_thresh = max(1, cv2.getTrackbarPos("Hough thresh", WINDOW))
+    min_line_len = cv2.getTrackbarPos("Min line len", WINDOW)
+    max_line_gap = cv2.getTrackbarPos("Max line gap", WINDOW)
 
-    cv2.imshow(WINDOW, edges)
+    edges = fft_preprocessing(
+        frame, radius_coef, edge_thresh, hough_thresh, min_line_len, max_line_gap
+    )
+    # edges = thresholding_preprocessing(
+    #     frame, radius_coef, edge_thresh, min_line_len, max_line_gap
+    # )
+
+    display = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    cv2.imshow(WINDOW, display)
 
     # Press 'q' to exit the video window
     if cv2.waitKey(1) & 0xFF == ord("q"):
