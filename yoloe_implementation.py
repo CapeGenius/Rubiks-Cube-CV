@@ -38,39 +38,77 @@ def filter_image_fft(original_image, radius_coefficient, blur_filter: bool = Fal
     almost_reconstructed = np.fft.ifft2(unshifted_image)
     reconstructed_image = np.real(almost_reconstructed)
 
-    return np.clip(reconstructed_image, 0, 255).astype(np.uint8)  # Canny needs uint8
+    return np.clip(reconstructed_image, 0, 255).astype(np.uint8)
+
+
+def hough_transform(
+    edges,
+    rho=1,
+    theta=np.pi / 180,
+    threshold=200,
+    minLineLength=80,
+    maxLineGap=10,
+):
+
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=rho,
+        theta=theta,
+        threshold=threshold,
+        minLineLength=minLineLength,
+        maxLineGap=maxLineGap,
+    )
+
+    if lines is not None:
+        for x1, y1, x2, y2 in lines.reshape(-1, 4):
+            cv2.line(edges, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
+
+    return edges
+
+
+def fft_preprocessing(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    fft_image = filter_image_fft(gray, 2)
+    mag = prewitt(fft_image)
+    edges = (mag > 0.05).astype(np.uint8) * 255
+
+    edges = hough_transform(edges)
+
+    return edges
+
+
+def thresholding_preprocessing(frame):
+    alpha = 1.0
+    beta = 1.0
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
+    median = cv2.medianBlur(gray, 5)
+    dst = cv2.adaptiveThreshold(
+        median, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, 3
+    )
+
+    # edges = cv2.Canny(dst, 20, 200)
+
+    edges = hough_transform(dst)
+    return edges
 
 
 model = YOLOE("yoloe-26m-seg.pt")
 
 
 # Open the default webcam (0)
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 
 while cap.isOpened():
     success, frame = cap.read()
     if not success:
         break
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    # blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    fft_image = filter_image_fft(gray, 20)
-    # edges = cv2.Canny(fft_image, 25, 50)
-    mag = prewitt(fft_image)
-    edges = (mag > 0.05).astype(np.uint8) * 255  # binary uint8 for Hough
+    WINDOW = "Cube Detection"
+    # edges = fft_preprocessing(frame)
+    edges = thresholding_preprocessing(frame)
 
-    lines = cv2.HoughLinesP(
-        edges,
-        rho=1,
-        theta=np.pi / 180,
-        threshold=200,
-        minLineLength=80,
-        maxLineGap=10,
-    )
-
-    if lines is not None:
-        for x1, y1, x2, y2 in lines.reshape(-1, 4):
-            cv2.line(edges, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
+    cv2.imshow(WINDOW, edges)
 
     # Press 'q' to exit the video window
     if cv2.waitKey(1) & 0xFF == ord("q"):
