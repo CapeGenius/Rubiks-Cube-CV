@@ -4,10 +4,12 @@ import random
 import numpy as np
 from skimage.filters import roberts, prewitt
 
+# used this source for training data: https://docs.ultralytics.com/yolov5/tutorials/train-custom-data
 # implemented hough lines based on this opencv article:
 #   https://opencv24-python-tutorials.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_houghlines/py_houghlines.html
 # implemented live camera with yoloe using this source:
 #   https://academy.ultralytics.com/courses/train-your-first-yolo/video-inference
+# used this kaggle dataset: https://www.kaggle.com/datasets/aryan7004/rubiks-cube-face-dataset/data
 
 
 def generate_cicle(original_image, radius_coefficient):
@@ -102,11 +104,11 @@ def thresholding_preprocessing(frame):
     return edges
 
 
-model = YOLOE("yoloe-26m-seg.pt")
-
+model = YOLOE("./runs/detect/train-2/weights/best.pt")
+# model.set_classes(["side-of-rubiks-cube"])
 
 # Open the default webcam (0)
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 WINDOW = "Cube Detection"
 cv2.namedWindow(WINDOW)
@@ -128,20 +130,28 @@ while cap.isOpened():
     if not success:
         break
 
-    radius_coef = max(1, cv2.getTrackbarPos("Radius coef", WINDOW))
-    edge_thresh = cv2.getTrackbarPos("Edge thresh x100", WINDOW) / 100
-    hough_thresh = max(1, cv2.getTrackbarPos("Hough thresh", WINDOW))
-    min_line_len = cv2.getTrackbarPos("Min line len", WINDOW)
-    max_line_gap = cv2.getTrackbarPos("Max line gap", WINDOW)
+    # predict based on frame
+    results = model.predict(frame)
 
-    edges = fft_preprocessing(
-        frame, radius_coef, edge_thresh, hough_thresh, min_line_len, max_line_gap
-    )
+    # read from trackbar
+    # radius_coef = max(1, cv2.getTrackbarPos("Radius coef", WINDOW))
+    # edge_thresh = cv2.getTrackbarPos("Edge thresh x100", WINDOW) / 100
+    # hough_thresh = max(1, cv2.getTrackbarPos("Hough thresh", WINDOW))
+    # min_line_len = cv2.getTrackbarPos("Min line len", WINDOW)
+    # max_line_gap = cv2.getTrackbarPos("Max line gap", WINDOW)
+
+    # edges = fft_preprocessing(
+    #     frame, radius_coef, edge_thresh, hough_thresh, min_line_len, max_line_gap
+    # )
     # edges = thresholding_preprocessing(
     #     frame, radius_coef, edge_thresh, min_line_len, max_line_gap
     # )
 
-    display = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    for r in results:
+        annotated_frame = r.plot()
+        # r.masks
+
+    display = annotated_frame
     cv2.imshow(WINDOW, display)
 
     # Press 'q' to exit the video window
