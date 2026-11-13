@@ -109,6 +109,61 @@ def nothing(_):
     pass
 
 
+# Define the colors of rubiks cube
+COLOR_MAPPINGS = {
+    "White": {"char": "W", "id": 1, "bgr": (255, 255, 255)},
+    "Yellow": {"char": "Y", "id": 2, "bgr": (0, 255, 255)},
+    "Green": {"char": "G", "id": 3, "bgr": (0, 200, 0)},
+    "Blue": {"char": "B", "id": 4, "bgr": (255, 0, 0)},
+    "Orange": {"char": "O", "id": 5, "bgr": (0, 140, 255)},
+    "Red": {"char": "R", "id": 6, "bgr": (0, 0, 255)},
+    "Unknown": {"char": "?", "id": 0, "bgr": (128, 128, 128)},
+}
+
+
+def classify_hsv_color(h, s, v):
+    """
+    Define what the hue value ranges are across the 6 colors of the rubik cube
+    """
+
+    # OpenCV Hue ranges from 0 to 180
+    if s < 60 and v > 150:
+        return "White"
+    if 0 <= h <= 10 or 160 <= h <= 180:
+        return "Red"  # Red is weird in OpenCv
+    elif 11 <= h <= 25:
+        return "Orange"
+    elif 26 <= h <= 35:
+        return "Yellow"
+    elif 36 <= h <= 85:
+        return "Green"
+    elif 86 <= h <= 130:
+        return "Blue"
+    else:
+        return "Unknown"
+
+
+FACES = "URFDLB"
+CENTERS = dict(zip(FACES, ["White", "Red", "Green", "Yellow", "Orange", "Blue"]))
+TOP = {"U": "B", "R": "U", "F": "U", "D": "F", "L": "U", "B": "U"}
+TARGET_WIDTH = 800  # Downsize to 800px width
+
+# Not using edge detection for now
+USE_CONTOURS = False
+
+
+def face_box(og_image):
+    """
+    Find bounding box of cube face
+    """
+    h, w = og_image.shape[:2]
+
+    # Make square to place cube face in
+    grid = (w // 6, h // 6, w, h)
+
+    return grid
+
+
 def read_face(og_image):
     """Read colors of 9 squares on cube face"""
 
@@ -125,22 +180,18 @@ def read_face(og_image):
     # Divide into 3x3 grid
     step_x = fw / 3.0
     step_y = fh / 3.0
-    id_radius = int(
-        min(step_x, step_y) * 0.15
-    )  # where it should look for the squares of rubiks cubs with 15% buffer
+    id_radius = int(min(step_x, step_y))
 
     square_results = []
     lab_results = []
 
     annotated_img = og_image.copy()  # to store
 
-    # 3 rows each with 3 squares
     for r in range(3):
         row_colors = []
         for c in range(3):
-            # Finding the center points
-            cx = int(fx + (c + 0.5) * step_x)
-            cy = int(fy + (r + 0.5) * step_y)
+            cx = int(fx + c * step_x)
+            cy = int(fy + (r) * step_y)
 
             # Finding the central patch and median HSV to hopefully ignore the noise
             patch = hsv_image[
@@ -189,6 +240,14 @@ def read_face(og_image):
 
         square_results.append(row_colors)
 
+    # 3 rows each with 3 squares
+    # for r in range(3):
+    #     row_colors = []
+    #     for c in range(3):
+    #         # Finding the center points
+    #         cx = int(fx + (c) * step_x)
+    #         cy = int(fy + (r) * step_y)
+
     # Draw 3x3 grid over image
     for i in range(4):
         x = int(fx + i * step_x)
@@ -233,7 +292,7 @@ def run_yoloe_detection():
 
             if len(face.boxes) > 0:
                 # get the box and check confidence score
-                if face.boxes[0].conf.item() > 0.88:
+                if face.boxes[0].conf.item() > 0.87:
                     print(f"face mask is {face.masks.xy}")
                     contour = face.masks.xy[0].astype(np.int32).reshape(-1, 1, 2)
                     cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
@@ -246,7 +305,6 @@ def run_yoloe_detection():
                     )
                     # Crop the isolated image to the object region
                     iso_crop = isolated[y1:y2, x1:x2]
-                    display = iso_crop
                     cv2.putText(
                         display,
                         f"confidence score {face.boxes[0].conf.item()}",
@@ -255,6 +313,9 @@ def run_yoloe_detection():
                         0.5,
                         (0, 255, 0),
                     )
+
+                    lab_results, annotated_image = read_face(iso_crop)
+                    display = annotated_image
 
         cv2.imshow(WINDOW, display)
 
