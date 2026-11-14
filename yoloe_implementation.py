@@ -3,6 +3,11 @@ import cv2
 import random
 import numpy as np
 from skimage.filters import roberts, prewitt
+import kociemba
+import webbrowser
+from pathlib import Path
+import html
+import sys
 
 # used this source for training data: https://docs.ultralytics.com/yolov5/tutorials/train-custom-data
 # implemented hough lines based on this opencv article:
@@ -322,7 +327,7 @@ def run_yoloe_detection():
                     # check if face has been scanned
                     if CENTERS_DICT[center_char] is None:
                         # store each face at scan assuming that rotation follows a certain pattern
-                        CENTERS_DICT[center_char] = lab_results
+                        CENTERS_DICT[center_char] = square_results
                         ordered_scan.append(center_char)
                     else:
                         pass
@@ -337,9 +342,97 @@ def run_yoloe_detection():
     cap.release()
     cv2.destroyAllWindows()
 
+    for key, value in CENTERS_DICT.items():
+        print(f"{key}: {value}")
+
+
+def show_twistyplayer(solution, setup=""):
+    """
+    Update HTML cube viewer with solution and show in browser
+    """
+    path = Path(__file__).resolve().parent / "cube_viewer.html"
+
+    page = path.read_text(encoding="utf-8")
+    page = page.replace("SOLUTION", html.escape(solution, quote=True))
+    page = page.replace("SETUP", html.escape(setup, quote=True))
+    page = page.replace(
+        "Moves: ", "Moves: " + (html.escape(solution) or "Already Solved")
+    )
+
+    path.write_text(page, encoding="utf-8")
+    webbrowser.open(path.as_uri())
+
+
+def invert_moves(moves):
+    """
+    Reverse scramble to solve the cube
+    """
+    return " ".join(
+        m if m.endswith("2") else m[:-1] if m.endswith("'") else m + "'"
+        for m in reversed(moves.split())
+    )
+
+
+def kociemba_solver():
+    # get the center of each face in order --> find mapped scan --> combine into one string
+    L_scan = "".join(
+        [
+            COLOR_MAPPINGS[item]["char"]
+            for row in CENTERS_DICT[ordered_scan[0]]
+            for item in row
+        ]
+    )
+    F_scan = "".join(
+        [
+            COLOR_MAPPINGS[item]["char"]
+            for row in CENTERS_DICT[ordered_scan[1]]
+            for item in row
+        ]
+    )
+    R_scan = "".join(
+        [
+            COLOR_MAPPINGS[item]["char"]
+            for row in CENTERS_DICT[ordered_scan[2]]
+            for item in row
+        ]
+    )
+    U_scan = "".join(
+        [
+            COLOR_MAPPINGS[item]["char"]
+            for row in CENTERS_DICT[ordered_scan[3]]
+            for item in row
+        ]
+    )
+    B_scan = "".join(
+        [
+            COLOR_MAPPINGS[item]["char"]
+            for row in CENTERS_DICT[ordered_scan[4]]
+            for item in row
+        ]
+    )
+    D_scan = "".join(
+        [
+            COLOR_MAPPINGS[item]["char"]
+            for row in CENTERS_DICT[ordered_scan[5]]
+            for item in row
+        ]
+    )
+
+    state = "".join([U_scan, R_scan, F_scan, D_scan, L_scan, B_scan])
+
+    # fix this
+    kociemba_scan = state
+
+    print(f"Final Scan is {kociemba_scan}")
+    solution = kociemba.solve(kociemba_scan)
+    setup = invert_moves(solution)
+    show_twistyplayer(solution, setup)
+
 
 if __name__ == "__main__":
     run_yoloe_detection()
+    print(ordered_scan)
+    kociemba_solver()
 """
 @misc{kirillov2023segment,
       title={Segment Anything},
