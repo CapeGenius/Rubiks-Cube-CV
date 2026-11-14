@@ -421,10 +421,18 @@ def kociemba_solver():
     state = "".join([U_scan, R_scan, F_scan, D_scan, L_scan, B_scan])
 
     # fix this
-    kociemba_scan = state
+    color_map = {
+        state[4]: "U",  # R -> U
+        state[13]: "R",  # G -> R
+        state[22]: "F",  # Y -> F
+        state[31]: "D",  # O -> D
+        state[40]: "L",  # B -> L
+        state[49]: "B",  # W -> B
+    }
+    cubestring = "".join(color_map[c] for c in state)
 
-    print(f"Final Scan is {kociemba_scan}")
-    solution = kociemba.solve(kociemba_scan)
+    print(f"Final Scan is {cubestring}")
+    solution = kociemba.solve(cubestring)
     setup = invert_moves(solution)
     show_twistyplayer(solution, setup)
 
