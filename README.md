@@ -12,6 +12,8 @@ For our machine vision project, we designed a Rubik’s Cube detection solution 
 
 ![](readme-files/system_diagram.png)
 
+*Fig 1\. Basic Overview of our System*
+
 For our Rubik’s Cube CV project, we created an MVP solution and a stretch goal solution. In our MVP solution, the user lines up the Rubik’s Cube face to a 3x3 grid on the screen and manually saves the state of the Rubik’s Cube face. In our stretch goal solution, the user displays the Rubik’s Cube face to the camera and a trained YOLOE segmentation model \`yoloe-26n-seg\` will segment the Rubik’s Cube face and pixel position in the captured video. Then, we isolate the segmented Rubik’s Cube image into a new image and line up a 3x3 grid with the isolated Rubik’s Cube. 
 
 For the MVP solution, we created a UI which instructs a user on how to scan the cube to generate a 3D solver which they can then follow. When scanning each face of the cube, the user has to line it up with a 3x3 grid on the screen, and once the user is happy with their alignment, they can press the space bar to save. We also show them the preliminary HSV colors of each tile in the user interface so they can adjust their lighting/environment if the cube colors are way off (although these get adjusted later in post processing to be more accurate anyway). 
@@ -30,7 +32,7 @@ In our function read\_face() we look to read the colors of the 9 squares on the 
 
 ![](readme-files/gts3.png)
 
-*Fig 1\. This shows an early attempt at the bounding box with an overlay of color identification. By including this output at the end of the function it provided a visual check for how the image was being processed and the handling of our algorithm.*
+*Fig 2\. This shows an early attempt at the bounding box with an overlay of color identification. By including this output at the end of the function it provided a visual check for how the image was being processed and the handling of our algorithm.*
 
 ## **(MVP) Cube Scanning**
 
@@ -40,7 +42,7 @@ To improve color classification (our main issue which we touch on later), we use
 
 ![](readme-files/UI_MVP.png)
 
-*Fig 2\. UI of our initial MVP cube scanner with grid and HSV Values*
+*Fig 3\. UI of our initial MVP cube scanner with grid and HSV Values*
 
 ## **Kociemba Integration**
 
@@ -62,7 +64,7 @@ One challenge encountered early on in the project, that had to be mitigated at e
 
 ![](readme-files/edge.png)
 
-*Fig 3\. Rubik’s cube after grayscale and Canny edge detection applied.*
+*Fig 4\. Rubik’s cube after grayscale and Canny edge detection applied.*
 
 ## **Color Classification** 
 
