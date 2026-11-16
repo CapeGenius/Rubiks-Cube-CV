@@ -23,102 +23,6 @@ ordered_scan = []
 LAB_SCANS = {}
 
 
-def generate_cicle(original_image, radius_coefficient):
-    height, width = original_image.shape[:2]
-
-    center_x = width // 2
-    center_y = height // 2
-    center = (center_x, center_y)
-
-    radius = min(width, height) // radius_coefficient
-
-    mask = np.zeros((height, width), dtype=np.uint8)
-    return cv2.circle(mask, center, radius, color=1, thickness=-1)
-
-
-def filter_image_fft(original_image, radius_coefficient, blur_filter: bool = False):
-    circle_filter = generate_cicle(original_image, radius_coefficient)
-
-    if blur_filter:
-        circle_filter = cv2.GaussianBlur(circle_filter, (5, 5), 0)
-
-    f_transform = np.fft.fft2(original_image)
-    f_shift = np.fft.fftshift(f_transform)
-    magnitude_spectrum = np.log(np.abs(f_shift))
-
-    filtered_fft_image = f_shift * circle_filter
-    unshifted_image = np.fft.ifftshift(filtered_fft_image)
-    almost_reconstructed = np.fft.ifft2(unshifted_image)
-    reconstructed_image = np.real(almost_reconstructed)
-
-    return np.clip(reconstructed_image, 0, 255).astype(np.uint8)
-
-
-def hough_transform(
-    edges,
-    rho=1,
-    theta=np.pi / 180,
-    threshold=200,
-    minLineLength=80,
-    maxLineGap=10,
-):
-
-    lines = cv2.HoughLinesP(
-        edges,
-        rho=rho,
-        theta=theta,
-        threshold=threshold,
-        minLineLength=minLineLength,
-        maxLineGap=maxLineGap,
-    )
-
-    if lines is not None:
-        for x1, y1, x2, y2 in lines.reshape(-1, 4):
-            cv2.line(edges, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-
-    return edges
-
-
-def fft_preprocessing(
-    frame, radius_coef, edge_thresh, hough_thresh, min_line_len, max_line_gap
-):
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    fft_image = filter_image_fft(gray, radius_coef)
-    mag = prewitt(fft_image)
-    edges = (mag > edge_thresh).astype(np.uint8) * 255
-
-    edges = hough_transform(
-        edges,
-        rho=1,
-        theta=np.pi / 180,
-        threshold=hough_thresh,
-        minLineLength=min_line_len,
-        maxLineGap=max_line_gap,
-    )
-
-    return edges
-
-
-def thresholding_preprocessing(frame):
-    alpha = 1.0
-    beta = 1.0
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    gray = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
-    median = cv2.medianBlur(gray, 5)
-    dst = cv2.adaptiveThreshold(
-        median, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, 3
-    )
-
-    # edges = cv2.Canny(dst, 20, 200)
-
-    edges = hough_transform(dst)
-    return edges
-
-
-def nothing(_):
-    pass
-
-
 # Define the colors of rubiks cube
 COLOR_MAPPINGS = {
     "White": {"char": "W", "id": 1, "bgr": (255, 255, 255)},
@@ -557,3 +461,100 @@ if __name__ == "__main__":
       primaryClass={cs.CV}
 }
 """
+
+
+# -------------------------------------- NO LONGER USED --------------------------------
+def generate_cicle(original_image, radius_coefficient):
+    height, width = original_image.shape[:2]
+
+    center_x = width // 2
+    center_y = height // 2
+    center = (center_x, center_y)
+
+    radius = min(width, height) // radius_coefficient
+
+    mask = np.zeros((height, width), dtype=np.uint8)
+    return cv2.circle(mask, center, radius, color=1, thickness=-1)
+
+
+def filter_image_fft(original_image, radius_coefficient, blur_filter: bool = False):
+    circle_filter = generate_cicle(original_image, radius_coefficient)
+
+    if blur_filter:
+        circle_filter = cv2.GaussianBlur(circle_filter, (5, 5), 0)
+
+    f_transform = np.fft.fft2(original_image)
+    f_shift = np.fft.fftshift(f_transform)
+    magnitude_spectrum = np.log(np.abs(f_shift))
+
+    filtered_fft_image = f_shift * circle_filter
+    unshifted_image = np.fft.ifftshift(filtered_fft_image)
+    almost_reconstructed = np.fft.ifft2(unshifted_image)
+    reconstructed_image = np.real(almost_reconstructed)
+
+    return np.clip(reconstructed_image, 0, 255).astype(np.uint8)
+
+
+def hough_transform(
+    edges,
+    rho=1,
+    theta=np.pi / 180,
+    threshold=200,
+    minLineLength=80,
+    maxLineGap=10,
+):
+
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=rho,
+        theta=theta,
+        threshold=threshold,
+        minLineLength=minLineLength,
+        maxLineGap=maxLineGap,
+    )
+
+    if lines is not None:
+        for x1, y1, x2, y2 in lines.reshape(-1, 4):
+            cv2.line(edges, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+
+    return edges
+
+
+def fft_preprocessing(
+    frame, radius_coef, edge_thresh, hough_thresh, min_line_len, max_line_gap
+):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    fft_image = filter_image_fft(gray, radius_coef)
+    mag = prewitt(fft_image)
+    edges = (mag > edge_thresh).astype(np.uint8) * 255
+
+    edges = hough_transform(
+        edges,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=hough_thresh,
+        minLineLength=min_line_len,
+        maxLineGap=max_line_gap,
+    )
+
+    return edges
+
+
+def thresholding_preprocessing(frame):
+    alpha = 1.0
+    beta = 1.0
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
+    median = cv2.medianBlur(gray, 5)
+    dst = cv2.adaptiveThreshold(
+        median, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 3, 3
+    )
+
+    # edges = cv2.Canny(dst, 20, 200)
+
+    edges = hough_transform(dst)
+    return edges
+
+
+def nothing(_):
+    pass
