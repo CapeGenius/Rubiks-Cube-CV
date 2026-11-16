@@ -282,14 +282,39 @@ def read_face(og_image):
     return lab_results, annotated_img, square_results
 
 
+def isolate_image(face, b_mask, frame):
+    contour = face.masks.xy[0].astype(np.int32).reshape(-1, 1, 2)
+    cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
+    mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
+    isolated = cv2.bitwise_and(mask3ch, frame)
+
+    return isolated
+
+
+def get_results_from_image(face, isolated):
+    # Bounding box coordinates
+    x1, y1, x2, y2 = face.boxes.xyxy.cpu().numpy().squeeze().astype(np.int32)
+    # Crop the isolated image to the object region
+    iso_crop = isolated[y1:y2, x1:x2]
+    # cv2.putText(
+    #     display,
+    #     f"confidence score {face.boxes[0].conf.item()}",
+    #     (10, 10),
+    #     cv2.FONT_HERSHEY_SIMPLEX,
+    #     0.5,
+    #     (0, 255, 0),
+    # )
+
+    return read_face(iso_crop)
+
+
 def run_yoloe_detection():
-    """ 
-    """
+    """ """
     model = YOLOE("./runs/segment/train-3/weights/best.pt")
     # model.set_classes(["side-of-rubiks-cube"])
 
     # Open the default webcam (0)
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
 
     WINDOW = "Cube Detection"
     cv2.namedWindow(WINDOW)
@@ -319,30 +344,14 @@ def run_yoloe_detection():
             if len(face.boxes) > 0:
                 # get the box and check confidence score
                 if face.boxes[0].conf.item() > 0.87:
-                    print(f"face mask is {face.masks.xy}")
+                    # print(f"face mask is {face.masks.xy}")
 
                     # gets the image from the mask and creates an isolated image
-                    contour = face.masks.xy[0].astype(np.int32).reshape(-1, 1, 2)
-                    cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
-                    mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
-                    isolated = cv2.bitwise_and(mask3ch, frame)
+                    isolated = isolate_image(face, b_mask, frame)
 
-                    # Bounding box coordinates
-                    x1, y1, x2, y2 = (
-                        face.boxes.xyxy.cpu().numpy().squeeze().astype(np.int32)
+                    lab_results, annotated_image, square_results = (
+                        get_results_from_image(face, isolated)
                     )
-                    # Crop the isolated image to the object region
-                    iso_crop = isolated[y1:y2, x1:x2]
-                    cv2.putText(
-                        display,
-                        f"confidence score {face.boxes[0].conf.item()}",
-                        (10, 10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        (0, 255, 0),
-                    )
-
-                    lab_results, annotated_image, square_results = read_face(iso_crop)
                     display = annotated_image
 
                     # get the center of face
@@ -448,7 +457,7 @@ def invert_moves(moves):
 
 def kociemba_solver():
     """
-    Order of scan: 
+    Order of scan:
         Orange, Green, Red --> w/ White on top
         White, Blue, Yellow --> w/ Orange on top
     """
