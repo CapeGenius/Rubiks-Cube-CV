@@ -132,7 +132,9 @@ Although our tests mostly came from live interaction, we also implemented variou
 
 # **Quickstart:** 
 
-First, install the following dependencies:   
+First, run this command to install the necessary dependencies:   
+`pip install opencv-python numpy kociemba ultralytics pillow scikit-image`
+
 **After cloning the repo, and installing the dependencies above, run the following commands:**  
 To run the non edge detecting version, simply run:  
 **\`python3 cube.py\`**  
