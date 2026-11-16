@@ -8,6 +8,7 @@ import webbrowser
 from pathlib import Path
 import html
 import sys
+import time
 
 # used this source for training data: https://docs.ultralytics.com/yolov5/tutorials/train-custom-data
 # implemented hough lines based on this opencv article:
@@ -19,6 +20,7 @@ import sys
 
 CENTERS_DICT = {"B": None, "W": None, "G": None, "R": None, "Y": None, "O": None}
 ordered_scan = []
+LAB_SCANS = {}
 
 
 def generate_cicle(original_image, radius_coefficient):
@@ -172,6 +174,27 @@ def face_box(og_image):
     return grid
 
 
+def classify_lab(color, references):
+    """
+    Compare each color to calibrated center colors
+    """
+    closest_color = None
+    smallest_distance = float("inf")
+
+    for name in references:
+        difference = color - references[name]
+        # Give more weight to differences in A & B channels?
+        difference = difference * [0.5, 1.5, 1.5]
+        distance = np.linalg.norm(difference)  # distance between colors
+
+        # Track closest color
+        if distance < smallest_distance:
+            smallest_distance = distance
+            closest_color = name
+
+    return closest_color
+
+
 def read_face(og_image):
     """Read colors of 9 squares on cube face"""
 
@@ -260,15 +283,18 @@ def read_face(og_image):
 
 
 def run_yoloe_detection():
-
+    """ 
+    """
     model = YOLOE("./runs/segment/train-3/weights/best.pt")
     # model.set_classes(["side-of-rubiks-cube"])
 
     # Open the default webcam (0)
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
 
     WINDOW = "Cube Detection"
     cv2.namedWindow(WINDOW)
+
+    next_scan_time = 0
 
     while cap.isOpened() and len(ordered_scan) < 6:
         success, frame = cap.read()
@@ -325,13 +351,32 @@ def run_yoloe_detection():
                     # ASSUME ORIENTATION STEPS: must rotate 2 right, 1 up, then 2 right
 
                     # check if face has been scanned
-                    if CENTERS_DICT[center_char] is None:
+                    if (
+                        center_char in CENTERS_DICT
+                        and LAB_SCANS.get(center_char) is None
+                        and time.monotonic() >= next_scan_time
+                    ):
                         # store each face at scan assuming that rotation follows a certain pattern
-                        CENTERS_DICT[center_char] = square_results
+                        LAB_SCANS[center_char] = lab_results
                         ordered_scan.append(center_char)
+                        next_scan_time = (
+                            time.monotonic() + 5
+                        )  # Wait 5s before next scan
                     else:
                         pass
                         # cv2.putText(display)
+
+        # Add text to tell when a face has been scanned
+        # TODO: Fix UI
+        cv2.putText(
+            display,
+            f"Face: {len(ordered_scan)}/6",
+            (20, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 255, 0),
+            2,
+        )
 
         cv2.imshow(WINDOW, display)
 
@@ -342,6 +387,33 @@ def run_yoloe_detection():
     cap.release()
     cv2.destroyAllWindows()
 
+    # Classify colors after all 6 faces are scanned
+    if len(ordered_scan) == 6:
+        references = {}
+
+        # Get LAB reference colors from centers
+        for face in ordered_scan:
+            for name, info in COLOR_MAPPINGS.items():
+                if info["char"] == face:
+                    references[name] = LAB_SCANS[face][4]
+
+        # Classify all piece colors using LAB
+        for face in ordered_scan:
+            colors = []
+            for sample in LAB_SCANS[face]:
+                color = classify_lab(sample, references)
+                colors.append(color)
+
+            # Make sure the center color is correct
+            for name in references:
+                if COLOR_MAPPINGS[name]["char"] == face:
+                    colors[4] = name
+
+            # Store colors in 3x3 grid
+            CENTERS_DICT[face] = [colors[0:3], colors[3:6], colors[6:9]]
+
+            print(face, CENTERS_DICT[face])
+
     for key, value in CENTERS_DICT.items():
         print(f"{key}: {value}")
 
@@ -350,17 +422,18 @@ def show_twistyplayer(solution, setup=""):
     """
     Update HTML cube viewer with solution and show in browser
     """
-    path = Path(__file__).resolve().parent / "cube_viewer.html"
+    template_path = Path(__file__).resolve().parent / "cube_viewer_template.html"
+    output_path = Path(__file__).resolve().parent / "cube_viewer.html"
 
-    page = path.read_text(encoding="utf-8")
+    page = template_path.read_text(encoding="utf-8")
     page = page.replace("SOLUTION", html.escape(solution, quote=True))
     page = page.replace("SETUP", html.escape(setup, quote=True))
     page = page.replace(
         "Moves: ", "Moves: " + (html.escape(solution) or "Already Solved")
     )
 
-    path.write_text(page, encoding="utf-8")
-    webbrowser.open(path.as_uri())
+    output_path.write_text(page, encoding="utf-8")
+    webbrowser.open(output_path.as_uri())
 
 
 def invert_moves(moves):
@@ -374,6 +447,11 @@ def invert_moves(moves):
 
 
 def kociemba_solver():
+    """
+    Order of scan: 
+        Orange, Green, Red --> w/ White on top
+        White, Blue, Yellow --> w/ Orange on top
+    """
     # get the center of each face in order --> find mapped scan --> combine into one string
     L_scan = "".join(
         [
@@ -399,21 +477,27 @@ def kociemba_solver():
     U_scan = "".join(
         [
             COLOR_MAPPINGS[item]["char"]
-            for row in CENTERS_DICT[ordered_scan[3]]
+            for row in np.rot90(
+                CENTERS_DICT[ordered_scan[3]], k=1
+            )  # Rotate to work with kociemba
             for item in row
         ]
     )
     B_scan = "".join(
         [
             COLOR_MAPPINGS[item]["char"]
-            for row in CENTERS_DICT[ordered_scan[4]]
+            for row in np.rot90(
+                CENTERS_DICT[ordered_scan[4]], k=3
+            )  # Rotate to work with kociemba
             for item in row
         ]
     )
     D_scan = "".join(
         [
             COLOR_MAPPINGS[item]["char"]
-            for row in CENTERS_DICT[ordered_scan[5]]
+            for row in np.rot90(
+                CENTERS_DICT[ordered_scan[5]], k=1
+            )  # Rotate to work with kociemba
             for item in row
         ]
     )
