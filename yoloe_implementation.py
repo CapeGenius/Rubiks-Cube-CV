@@ -215,7 +215,7 @@ def get_results_from_image(face, isolated):
 def calculate_scan_time(center_char, next_scan_time, lab_results):
     if (
         center_char in CENTERS_DICT
-        and LAB_SCANS.get(center_char) is None
+        # and LAB_SCANS.get(center_char) is None
         and time.monotonic() >= next_scan_time
     ):
         # store each face at scan assuming that rotation follows a certain pattern
@@ -254,12 +254,15 @@ def run_yoloe_detection():
     # model.set_classes(["side-of-rubiks-cube"])
 
     # Open the default webcam (0)
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
 
     WINDOW = "Cube Detection"
     cv2.namedWindow(WINDOW)
 
     next_scan_time = 0
+
+    # Order to scan faces
+    scan_colors = ["Orange", "Green", "Red", "White", "Blue", "Yellow"]
 
     while cap.isOpened() and len(ordered_scan) < 6:
         success, frame = cap.read()
@@ -293,14 +296,32 @@ def run_yoloe_detection():
                     # cv2.putText(display)
 
         # Add text to tell when a face has been scanned
-        # TODO: Fix UI
+        h, w = display.shape[:2]
+        i = len(ordered_scan)
+        if i < 6:
+            message = f"{i}/6  Show {scan_colors[i]} center"
+            instruction = "Keep White on top" if i < 3 else "Keep Orange on top"
+        else:
+            message = "6/6  All faces scanned"
+            instruction = "Scanning complete"
+
+        cv2.rectangle(display, (0, 0), (w, 75), (30, 30, 30), -1)
         cv2.putText(
             display,
-            f"Face: {len(ordered_scan)}/6",
-            (20, 40),
+            message,
+            (12, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 255, 0),
+            0.7,
+            (255, 255, 255),
+            2,
+        )
+        cv2.putText(
+            display,
+            instruction,
+            (12, 62),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 255, 255),
             2,
         )
 
