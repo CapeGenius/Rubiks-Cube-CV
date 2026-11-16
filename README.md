@@ -10,7 +10,7 @@ For our machine vision project, we designed a Rubik’s Cube detection solution 
 
 # **Overall System Architecture**
 
-![][image1]
+![](readme-files/system_diagram.png)
 
 For our Rubik’s Cube CV project, we created an MVP solution and a stretch goal solution. In our MVP solution, the user lines up the Rubik’s Cube face to a 3x3 grid on the screen and manually saves the state of the Rubik’s Cube face. In our stretch goal solution, the user displays the Rubik’s Cube face to the camera and a trained YOLOE segmentation model \`yoloe-26n-seg\` will segment the Rubik’s Cube face and pixel position in the captured video. Then, we isolate the segmented Rubik’s Cube image into a new image and line up a 3x3 grid with the isolated Rubik’s Cube. 
 
@@ -27,7 +27,9 @@ In both solutions, after computing the cubestring, we pass the cubestring to the
 ## **Face Scanning**
 
 In our function read\_face() we look to read the colors of the 9 squares on the cube. To do so the og\_image is loaded and a previous function face\_box() is called which provides the region of interest by providing the bounding box. To decouple the lighting variations from the original BGR (Blue, Green, Red) image we converted it to two color spaces: HSV (Hue, Saturation, Value) for hard-coded classification values of color and LAB (lightness, green-red axis, and blue-yellow axis) for downstream calibration and because it provided more information. Because of the addition of a bounding box it could easily be partitioned into 9 equal cells where within each square a region of interest (id\_radius) is sampled. Computing the np.median across each of these helps suppress the camera sensor noise and specular highlights from the rubik cube image.   
-![][image2]  
+
+![](readme-files/gts3.png)
+
 *Fig 1\. This shows an early attempt at the bounding box with an overlay of color identification. By including this output at the end of the function it provided a visual check for how the image was being processed and the handling of our algorithm.*
 
 ## **(MVP) Cube Scanning**
@@ -36,7 +38,8 @@ Next, for our initial MVP solution, we implemented a manual scanning process. Fi
 
 To improve color classification (our main issue which we touch on later), we used the center piece of each face as the reference color (since the center piece of each face of the Rubik's Cube determines what color the side is, we know what color it is). We store the LAB values for each center piece in a reference dictionary, and the 9 sampled colors in a separate dictionary. After we scan all the faces, we compare the 54 pieces (6 sides \* 9 pieces per side), using weighted euclidean distance in LAB space. The closest reference center determines the color of each piece. This calibration was necessary since subtle changes in lighting greatly affected our scans and during testing we would often end up with scans that were impossible to to create using the turns we could do on a Rubik's Cube, and thus were impossible to solve 
 
-![][image3]  
+![](readme-files/UI_MVP.png)
+
 *Fig 2\. UI of our initial MVP cube scanner with grid and HSV Values*
 
 ## **Kociemba Integration**
@@ -56,7 +59,9 @@ After some investigation, we learned about YOLOE (You Only Look Once \- Everythi
 ## **Edge Detection**
 
 One challenge encountered early on in the project, that had to be mitigated at each iteration of the project, was noise. In figure 2 a rubik’s cube can be seen after it was grayscale and edge detection applied. What can also be seen are background objects outlined. When initially attempting to use the completed edges of the cube as the different points of classification this background noise created issues as too many edges were detected. To mitigate this logic a proper square was used as the rubik’s cube will always have three columns and three rows.   
-![][image4]  
+
+![](readme-files/edge.png)
+
 *Fig 3\. Rubik’s cube after grayscale and Canny edge detection applied.*
 
 ## **Color Classification** 
@@ -95,7 +100,9 @@ In terms of a broader robotics use, the Computer Vision Techniques we used can b
 
 # **Testing**
 
-Throughout the process we heavily relied on print statements and outputting images (i.e Fig. 1\) as a check for ourselves on how the images were being processed and if the output was expected. This was particularly important for color calibration and testing as tweaking values was necessary and the output from print statements helped inform that. We also tested in various lighting conditions.
+Throughout the process we heavily relied on print statements and outputting images (i.e Fig. 1\) as a check for ourselves on how the images were being processed and if the output was expected. This was particularly important for color calibration and testing as tweaking values was necessary and the output from print statements helped inform that. We also tested in various lighting conditions, environments, backgrounds, and with otehr people testing the UI.
+
+Although our tests mostly came from live interaction, we also implemented various Unit Tests which can be found in `test_cube.py`. Among our tests include testing there are 9 colors per side for each sample, checking all 6 colors identified correctly, testing scrambles are reveresed properly, checking LAB colors, and checking if the same face scanned twice will not be added again.
 
 ## **Learning Objectives and Final Takeaways**
 

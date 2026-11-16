@@ -285,7 +285,7 @@ def calculate_scan_time(center_char, next_scan_time, lab_results):
     """
     if (
         center_char in CENTERS_DICT
-        # and LAB_SCANS.get(center_char) is None
+        and LAB_SCANS.get(center_char) is None
         and time.monotonic() >= next_scan_time
     ):
         # store each face at scan assuming that rotation follows a certain pattern
