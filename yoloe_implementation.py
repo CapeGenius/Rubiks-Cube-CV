@@ -37,7 +37,14 @@ COLOR_MAPPINGS = {
 
 def classify_hsv_color(h, s, v):
     """
-    Define what the hue value ranges are across the 6 colors of the rubik cube
+    Define what the hue value ranges are across the 6 colors of the Rubik's Cube
+
+    Arguments:
+        h: int value representing hue
+        s: int value representing saturation
+        v: int value representing value
+    Returns:
+        string value represting color
     """
 
     # OpenCV Hue ranges from 0 to 180
@@ -69,6 +76,12 @@ USE_CONTOURS = False
 def face_box(og_image):
     """
     Find bounding box of cube face
+
+    Arguments:
+        og_image = 2D nparray storing image
+
+    Returns:
+        grid: tuple storing representing the x-offset for tile, y-offset for tile center, width, and height of image
     """
     h, w = og_image.shape[:2]
 
@@ -80,7 +93,13 @@ def face_box(og_image):
 
 def classify_lab(color, references):
     """
-    Compare each color to calibrated center colors
+    Compare each color to calibrated center colors and find the closest color value
+
+    Arguments:
+        color: float value representing LAB color value of a tile
+
+    Returns:
+        closest_color: closest lab color value of tile
     """
     closest_color = None
     smallest_distance = float("inf")
@@ -100,7 +119,16 @@ def classify_lab(color, references):
 
 
 def read_face(og_image):
-    """Read colors of 9 squares on cube face"""
+    """Read colors of 9 squares on cube face
+
+    Arguments:
+        og_image = 2D nparray storing image
+
+    Returns:
+        lab_results: 3x3 array storing calculated HSV color value for each tile on Rubik's Cube face
+        annotated_image: cropped image of Rubik's Cube face
+        square_results: 3x3 array storing mapped color value in each element (representing face)
+    """
 
     # if face_bounding_box is None:
     #     largest_contour = max(contours, key=cv2.contourArea)
@@ -187,6 +215,20 @@ def read_face(og_image):
 
 
 def isolate_image(face, b_mask, frame):
+    """
+    Uses segmented mask of Rubik's Cube face from YOLOE, draws contour of
+    the face on a zeroed bitmask of the image, and then applies a bitwise AND
+    on the original frame to remove the background. Finally will return the image
+    with only the isolated Rubik's Cube
+
+    Arguments:
+        face: Results object (stores the segmented image result from the YOLOE prediction model)
+        b_mask: zeroed bitmask, with the shape of the original frame (2D nparray)
+        frame: image frame of captured video (2D nparray)
+
+    Returns:
+        isolated: segmented image within the image frame (2D np array)
+    """
     contour = face.masks.xy[0].astype(np.int32).reshape(-1, 1, 2)
     cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
     mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
@@ -196,6 +238,19 @@ def isolate_image(face, b_mask, frame):
 
 
 def get_results_from_image(face, isolated):
+    """
+    Crops the isolated image to remove the background and analyzes the face's color values
+
+    Arguments:
+        face: Results object (stores the segmented image result from the YOLOE prediction model)
+        isolated: segmented image within the image frame (2D np array)
+
+    Returns:
+        lab_results: 3x3 array storing calculated HSV color value for each tile on Rubik's Cube face
+        annotated_image: cropped image of Rubik's Cube face
+        square_results: 3x3 array storing mapped color value in each element (representing face)
+
+    """
     # Bounding box coordinates
     x1, y1, x2, y2 = face.boxes.xyxy.cpu().numpy().squeeze().astype(np.int32)
     # Crop the isolated image to the object region
@@ -213,6 +268,21 @@ def get_results_from_image(face, isolated):
 
 
 def calculate_scan_time(center_char, next_scan_time, lab_results):
+    """
+    Determines whether a face has already been scanned. If the face is a new face,
+    it will store the center tile's color of the face as an element in a global variable ordered_scan.
+    It will also map the center tile's color to its corresponding face. In addition, it will
+    give the user 5 seconds to scan a new face. If not, this function will ignore the face and not
+    adjust the next_scan_time
+
+    Arguments:
+        center_char: string value storing the color mappings of the center tile
+        next_scan_time: float value storing the next available time that a scan will register new faces
+        lab_results: 3x3 array storing calculated HSV color value for each tile on Rubik's Cube face
+
+    Returns:
+        next_scan_time: float value storing the next available time that a scan will register new faces
+    """
     if (
         center_char in CENTERS_DICT
         # and LAB_SCANS.get(center_char) is None
@@ -227,6 +297,24 @@ def calculate_scan_time(center_char, next_scan_time, lab_results):
 
 
 def process_face(face, b_mask, frame, next_scan_time, confidence_score=0.87):
+    """
+    When the YOLOE model detects a potential face, process_face() will determine whether the segmented image
+    passes the confidence score threshold to be analyzed. It will then isolate the Rubik's Cube face in the image (isolate_iamge),
+    crop the image to just the face and and find the color values of each tile in the face, and then determiine
+    whether the face should be added as an element to ordered_scan global variable. Once done, it will return the
+    cropped image of the Rubik's Cube and the next valid time for a Rubik's Cube face scan.
+
+    Arugments:
+        face: Results object (stores the segmented image result from the YOLOE prediction model)
+        b_mask: zeroed bitmask, with the shape of the original frame (2D nparray)
+        frame: image frame of captured video (2D nparray)
+        next_scan_time: float value storing the next available time that a scan will register new faces
+        confidence_score: float value used to threshold confidence_score for potential cube faces
+
+    Returns:
+        next_scan_time: float value storing the next available time that a scan will register new faces
+
+    """
     if face.boxes[0].conf.item() > confidence_score:
         # print(f"face mask is {face.masks.xy}")
 
@@ -249,7 +337,16 @@ def process_face(face, b_mask, frame, next_scan_time, confidence_score=0.87):
 
 
 def run_yoloe_detection():
-    """ """
+    """
+    Main video loop that uses YOLOE model to scan Rubik's Cube faces and digitally reconstruct
+    Rubik's Cube
+
+    Arguments:
+        None
+
+    Returns:
+        None
+    """
     model = YOLOE("./runs/segment/train-3/weights/best.pt")
     # model.set_classes(["side-of-rubiks-cube"])
 
@@ -368,6 +465,10 @@ def run_yoloe_detection():
 def show_twistyplayer(solution, setup=""):
     """
     Update HTML cube viewer with solution and show in browser
+
+    Arguments:
+        solution: string of moves to solved cube state
+        setup: string of the reversed moves to get from shuffled
     """
     template_path = Path(__file__).resolve().parent / "cube_viewer_template.html"
     output_path = Path(__file__).resolve().parent / "cube_viewer.html"
@@ -386,6 +487,12 @@ def show_twistyplayer(solution, setup=""):
 def invert_moves(moves):
     """
     Reverse scramble to solve the cube
+
+    Arguments:
+        moves: string of moves to solved cube state
+
+    Returns:
+        string containing the starting state of the Rubik's Cube
     """
     return " ".join(
         m if m.endswith("2") else m[:-1] if m.endswith("'") else m + "'"
@@ -395,6 +502,11 @@ def invert_moves(moves):
 
 def kociemba_solver():
     """
+    Solver function that computes cubestring of the reconstructed Rubik's and passes it
+    to the solver. Once the solver determines the steps needed to unshuffle Rubik's Cube,
+    we visualize it with twistyplayer
+
+
     Order of scan:
         Orange, Green, Red --> w/ White on top
         White, Blue, Yellow --> w/ Orange on top
