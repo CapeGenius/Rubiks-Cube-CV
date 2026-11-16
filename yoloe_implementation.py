@@ -37,7 +37,14 @@ COLOR_MAPPINGS = {
 
 def classify_hsv_color(h, s, v):
     """
-    Define what the hue value ranges are across the 6 colors of the rubik cube
+    Define what the hue value ranges are across the 6 colors of the Rubik's Cube
+
+    Arguments:
+        h: int value representing hue
+        s: int value representing saturation
+        v: int value representing value
+    Returns:
+        string value represting color
     """
 
     # OpenCV Hue ranges from 0 to 180
@@ -69,6 +76,12 @@ USE_CONTOURS = False
 def face_box(og_image):
     """
     Find bounding box of cube face
+
+    Arguments:
+        og_image = 2D nparray storing image
+
+    Returns:
+        grid: tuple storing representing the x-offset for tile, y-offset for tile center, width, and height of image
     """
     h, w = og_image.shape[:2]
 
@@ -80,7 +93,13 @@ def face_box(og_image):
 
 def classify_lab(color, references):
     """
-    Compare each color to calibrated center colors
+    Compare each color to calibrated center colors and find the closest color value
+
+    Arguments:
+        color: float value representing LAB color value of a tile
+
+    Returns:
+        closest_color: closest lab color value of tile
     """
     closest_color = None
     smallest_distance = float("inf")
@@ -100,7 +119,16 @@ def classify_lab(color, references):
 
 
 def read_face(og_image):
-    """Read colors of 9 squares on cube face"""
+    """Read colors of 9 squares on cube face
+
+    Arguments:
+        og_image = 2D nparray storing image
+
+    Returns:
+        lab_results: 3x3 array storing calculated HSV color value for each tile on Rubik's Cube face
+        annotated_image: cropped image of Rubik's Cube face
+        square_results: 3x3 array storing mapped color value in each element (representing face)
+    """
 
     # if face_bounding_box is None:
     #     largest_contour = max(contours, key=cv2.contourArea)
@@ -416,6 +444,10 @@ def run_yoloe_detection():
 def show_twistyplayer(solution, setup=""):
     """
     Update HTML cube viewer with solution and show in browser
+
+    Arguments:
+        solution: string of moves to solved cube state
+        setup: string of the reversed moves to get from shuffled
     """
     template_path = Path(__file__).resolve().parent / "cube_viewer_template.html"
     output_path = Path(__file__).resolve().parent / "cube_viewer.html"
@@ -434,6 +466,12 @@ def show_twistyplayer(solution, setup=""):
 def invert_moves(moves):
     """
     Reverse scramble to solve the cube
+
+    Arguments:
+        moves: string of moves to solved cube state
+
+    Returns:
+        string containing the starting state of the Rubik's Cube
     """
     return " ".join(
         m if m.endswith("2") else m[:-1] if m.endswith("'") else m + "'"
@@ -443,6 +481,11 @@ def invert_moves(moves):
 
 def kociemba_solver():
     """
+    Solver function that computes cubestring of the reconstructed Rubik's and passes it
+    to the solver. Once the solver determines the steps needed to unshuffle Rubik's Cube,
+    we visualize it with twistyplayer
+
+
     Order of scan:
         Orange, Green, Red --> w/ White on top
         White, Blue, Yellow --> w/ Orange on top
