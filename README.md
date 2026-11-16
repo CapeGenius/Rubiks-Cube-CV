@@ -10,7 +10,7 @@ For our machine vision project, we designed a Rubik’s Cube detection solution 
 
 # **Overall System Architecture**
 
-![](system_diagram.drawio(1).png)
+![](readme-files/system_diagram.png)
 
 *Fig 1\. Basic Overview of our System*
 
