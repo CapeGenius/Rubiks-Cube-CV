@@ -226,8 +226,8 @@ def calculate_scan_time(center_char, next_scan_time, lab_results):
     return next_scan_time
 
 
-def process_face(face, b_mask, frame, next_scan_time):
-    if face.boxes[0].conf.item() > 0.87:
+def process_face(face, b_mask, frame, next_scan_time, confidence_score=0.87):
+    if face.boxes[0].conf.item() > confidence_score:
         # print(f"face mask is {face.masks.xy}")
 
         # gets the image from the mask and creates an isolated image
