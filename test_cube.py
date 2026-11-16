@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-import edge_detection as cube  # Import
+import cube as cube  # Import
 from ultralytics import YOLOE
 import yoloe_implementation as yoloe
 from pathlib import Path
@@ -52,9 +52,6 @@ def test_lab_colors():
     result = cube.classify_lab(color, references)
 
     assert result == "Red"
-
-
-# TODO:
 
 
 # Additional YOLOE Implementation tests ----------------------------
