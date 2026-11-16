@@ -104,7 +104,7 @@ In terms of a broader robotics use, the Computer Vision Techniques we used can b
 
 Throughout the process we heavily relied on print statements and outputting images (i.e Fig. 1\) as a check for ourselves on how the images were being processed and if the output was expected. This was particularly important for color calibration and testing as tweaking values was necessary and the output from print statements helped inform that. We also tested in various lighting conditions, environments, backgrounds, and with otehr people testing the UI.
 
-Although our tests mostly came from live interaction, we also implemented various Unit Tests which can be found in `test_cube.py`. Among our tests include testing there are 9 colors per side for each sample, checking all 6 colors identified correctly, testing scrambles are reveresed properly, checking LAB colors, and checking if the same face scanned twice will not be added again.
+Although our tests mostly came from live interaction, we also implemented various Unit Tests which can be found in `test_cube.py`. Among our tests include testing there are 9 colors per side for each sample, checking all 6 colors identified correctly, testing scrambles are reveresed properly, checking LAB colors, and checking if the same face scanned twice will not be added again. All of our Unit Tests Passed.
 
 ## **Learning Objectives and Final Takeaways**
 
