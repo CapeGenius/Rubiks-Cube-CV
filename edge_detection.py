@@ -5,6 +5,7 @@ import html
 import webbrowser
 from pathlib import Path
 import kociemba
+from skimage.color import rgb2lab, deltaE_ciede2000
 
 # Define the colors of rubiks cube
 COLOR_MAPPINGS = {
@@ -17,10 +18,10 @@ COLOR_MAPPINGS = {
     "Unknown": {"char": "?", "id": 0, "bgr": (128, 128, 128)},
 }
 
-
+# Initial implementation for showing on UI, use LAB to actually classify colors
 def classify_hsv_color(h, s, v):
     """
-    Define what the hue value ranges are across the 6 colors of the rubik cube
+    Define what the hue value ranges are across the 6 colors of the Rubiks Cube
     """
 
     # OpenCV Hue ranges from 0 to 180
@@ -48,25 +49,6 @@ TARGET_WIDTH = 800  # Downsize to 800px width
 # Not using edge detection for now
 USE_CONTOURS = False
 
-# # The original image size is (4032, 3024, 3) which is too large
-# # Load raw image
-# raw_image = cv2.imread("face1_rubiks_cube.jpg")
-# if raw_image is None:
-#     print("Could not find image")
-
-# # Downsize to 800px width
-# TARGET_WIDTH = 800
-# h_orig, w_orig = raw_image.shape[:2]
-# scale = TARGET_WIDTH / float(w_orig)
-# target_height = int(h_orig * scale)
-# og_image = cv2.resize(
-#     raw_image, (TARGET_WIDTH, target_height), interpolation=cv2.INTER_AREA
-# )
-# img_area = og_image.shape[0] * og_image.shape[1]
-# # og_image = cv2.imread("face1_rubiks_cube.jpg")
-# # print("image read")
-# # print(og_image.shape)
-
 
 def face_box(og_image):
     """
@@ -89,12 +71,6 @@ def face_box(og_image):
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     edges = cv2.Canny(blur, threshold1=30, threshold2=100)
 
-    # # output and display - visual check
-    # cv2.imwrite("edges_output_face1.jpg", edges)
-    # # cv2.imshow("Canny Edges", edges)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-
     # Close gap for the edges that are not defined the full way
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
@@ -102,12 +78,6 @@ def face_box(og_image):
     contours, hierarchy = cv2.findContours(
         closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
-
-    # Now easiest to find the 'bounding box' to help in ignoring outside noise
-    # contours, hierarchy = cv2.findContours(
-    #     full_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-    # )
-    # print(f"Total contours: {len(contours)}")  # check how much it's detecting
 
     face_bounding_box = None
     for c in sorted(contours, key=cv2.contourArea, reverse=True):
@@ -138,6 +108,10 @@ def read_face(og_image):
     # Originally had a complicated way to get squares inside bounding box, now trying ot get the 3x3 and classify colors
     hsv_image = cv2.cvtColor(og_image, cv2.COLOR_BGR2HSV)
     lab_image = cv2.cvtColor(og_image, cv2.COLOR_BGR2LAB)
+    # # Experiment w/ skimage, doesn't seem to increase accuracy
+    # rgb_image = cv2.cvtColor(og_image, cv2.COLOR_BGR2RGB)
+    # lab_image = rgb2lab(rgb_image)
+
     # Divide into 3x3 grid
     step_x = fw / 3.0
     step_y = fh / 3.0
@@ -216,21 +190,6 @@ def read_face(og_image):
     return lab_results, annotated_img
 
 
-# # Print the layour for double check
-# print("\nDetected Face Colors (3x3):")
-# for row in square_results:
-#     print(" ".join(f"[{c:^7}]" for c in row))
-
-# # create image
-# cv2.imwrite("detected_face1.jpg", annotated_img)
-
-# OLD CODE
-
-# # Now need to extract the squares inside the bounding box
-# expected_sq_area = (fw * fh) / 9
-# cube_squares = []
-
-
 def classify_lab(color, references):
     """
     Compare each color to calibrated center colors
@@ -239,6 +198,7 @@ def classify_lab(color, references):
     smallest_distance = float("inf")
 
     for name in references:
+        # distance = deltaE_ciede2000(color, references[name]) # Test if works better
         difference = color - references[name]
         # Give more weight to differences in A & B channels
         difference = difference * [0.5, 1.5, 1.5]
@@ -260,7 +220,6 @@ def scan_cube():
     scans, references = {}, {}
     i = 0
 
-    #
     while i < 6:
         ok, frame = camera.read()
         if not ok:
@@ -366,33 +325,30 @@ def show_twistyplayer(solution, setup=""):
     """
     Update HTML cube viewer with solution and show in browser
     """
-    path = Path(__file__).resolve().parent / "cube_viewer.html"
+    template_path = Path(__file__).resolve().parent / "cube_viewer_template.html"
+    output_path = Path(__file__).resolve().parent / "cube_viewer.html"
 
-    page = path.read_text(encoding="utf-8")
+    page = template_path.read_text(encoding="utf-8")
     page = page.replace("SOLUTION", html.escape(solution, quote=True))
     page = page.replace("SETUP", html.escape(setup, quote=True))
     page = page.replace(
         "Moves: ", "Moves: " + (html.escape(solution) or "Already Solved")
     )
 
-    path.write_text(page, encoding="utf-8")
-    webbrowser.open(path.as_uri())
+    output_path.write_text(page, encoding="utf-8")
+    webbrowser.open(output_path.as_uri())
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        solution = " ".join(sys.argv[1:]).replace("’", "'")
-        setup = ""
-    else:
-        state = scan_cube()
-        # Stop if quit during scanning
-        if state is None:
-            sys.exit()
+    state = scan_cube()
+    # Stop if quit during scanning
+    if state is None:
+        sys.exit()
 
-        solved = "".join(face * 9 for face in FACES)
+    solved = "".join(face * 9 for face in FACES)
 
-        solution = "" if state == solved else kociemba.solve(state)
-        setup = invert_moves(solution)
-        print("Solution:", solution or "Already solved")
+    solution = "" if state == solved else kociemba.solve(state)
+    setup = invert_moves(solution)
+    print("Solution:", solution or "Already Solved")
 
     show_twistyplayer(solution, setup)
