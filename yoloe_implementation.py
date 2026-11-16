@@ -308,6 +308,42 @@ def get_results_from_image(face, isolated):
     return read_face(iso_crop)
 
 
+def calculate_scan_time(center_char, next_scan_time, lab_results):
+    if (
+        center_char in CENTERS_DICT
+        and LAB_SCANS.get(center_char) is None
+        and time.monotonic() >= next_scan_time
+    ):
+        # store each face at scan assuming that rotation follows a certain pattern
+        LAB_SCANS[center_char] = lab_results
+        ordered_scan.append(center_char)
+        next_scan_time = time.monotonic() + 5  # Wait 5s before next scan
+
+    return next_scan_time
+
+
+def process_face(face, b_mask, frame, next_scan_time):
+    if face.boxes[0].conf.item() > 0.87:
+        # print(f"face mask is {face.masks.xy}")
+
+        # gets the image from the mask and creates an isolated image
+        isolated = isolate_image(face, b_mask, frame)
+
+        lab_results, annotated_image, square_results = get_results_from_image(
+            face, isolated
+        )
+
+        # get the center of face
+        center_char = COLOR_MAPPINGS[square_results[1][1]]["char"]
+
+        # ASSUME ORIENTATION STEPS: must rotate 2 right, 1 up, then 2 right
+
+        # check if face has been scanned
+        next_scan_time = calculate_scan_time(center_char, next_scan_time, lab_results)
+
+        return annotated_image, next_scan_time
+
+
 def run_yoloe_detection():
     """ """
     model = YOLOE("./runs/segment/train-3/weights/best.pt")
@@ -346,34 +382,11 @@ def run_yoloe_detection():
                 if face.boxes[0].conf.item() > 0.87:
                     # print(f"face mask is {face.masks.xy}")
 
-                    # gets the image from the mask and creates an isolated image
-                    isolated = isolate_image(face, b_mask, frame)
-
-                    lab_results, annotated_image, square_results = (
-                        get_results_from_image(face, isolated)
+                    annotated_image, next_scan_time = process_face(
+                        face, b_mask, frame, next_scan_time
                     )
                     display = annotated_image
-
-                    # get the center of face
-                    center_char = COLOR_MAPPINGS[square_results[1][1]]["char"]
-
-                    # ASSUME ORIENTATION STEPS: must rotate 2 right, 1 up, then 2 right
-
-                    # check if face has been scanned
-                    if (
-                        center_char in CENTERS_DICT
-                        and LAB_SCANS.get(center_char) is None
-                        and time.monotonic() >= next_scan_time
-                    ):
-                        # store each face at scan assuming that rotation follows a certain pattern
-                        LAB_SCANS[center_char] = lab_results
-                        ordered_scan.append(center_char)
-                        next_scan_time = (
-                            time.monotonic() + 5
-                        )  # Wait 5s before next scan
-                    else:
-                        pass
-                        # cv2.putText(display)
+                    # cv2.putText(display)
 
         # Add text to tell when a face has been scanned
         # TODO: Fix UI
